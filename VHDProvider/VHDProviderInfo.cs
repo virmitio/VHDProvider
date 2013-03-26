@@ -21,15 +21,20 @@ namespace VHDProvider{
 
    
 
-    public class AzureProviderInfo : UniversalProviderInfo {
-        internal static AzureLocation AzureNamespace = new AzureLocation(null, new Path(), null);
-        internal static AzureProviderInfo NamespaceProvider;
+    public class VHDProviderInfo : UniversalProviderInfo {
+        //internal static AzureLocation AzureNamespace = new AzureLocation(null, new Path(), null);
+        internal static VHDProviderInfo NamespaceProvider;
 
         /* public CmdletProvider GetProvider() {
             return this.foo();
         } */
         
         internal Collection<PSDriveInfo> AddingDrives = new Collection<PSDriveInfo>();
+
+        public override ILocation GetLocation(string path)
+        {
+            throw new PSNotImplementedException();
+        }
 
         protected override string Prefix {
             get
@@ -39,43 +44,8 @@ namespace VHDProvider{
             }
         }
 
-        public AzureProviderInfo(ProviderInfo providerInfo)
+        public VHDProviderInfo(ProviderInfo providerInfo)
             : base(providerInfo) {
-        }
-
-        public override ILocation GetLocation(string path) {
-            throw new PSNotImplementedException();
-            var parsedPath = Path.ParseWithContainer(path);
-
-            // strip off the azure:
-            /*
-            if (parsedPath.Scheme != string.Empty && parsedPath.Scheme != AzureDriveInfo.ProviderScheme) {
-                return AzureLocation.InvalidLocation;
-            }*/
-
-            // is this just a empty location?
-            if (string.IsNullOrEmpty(parsedPath.HostAndPort)) {
-                NamespaceProvider = NamespaceProvider ?? this;
-                return AzureNamespace;
-            }
-
-
-
-            var byAccount = AddingDrives.Union(Drives).Select(each => each as AzureDriveInfo).Where(each =>  each.HostAndPort == parsedPath.HostAndPort || each.ActualHostAndPort == parsedPath.HostAndPort);
-
-            if (!byAccount.Any())
-            {
-                return AzureLocation.UnknownLocation;
-            }
-
-            var byContainer = byAccount.Where(each => each.ContainerName == parsedPath.Container);
-            var byFolder = byContainer.Where(each => each.Path.IsSubpath(parsedPath)).OrderByDescending(each => each.RootPath.Length);
-
-            var result = byFolder.FirstOrDefault() ?? byContainer.FirstOrDefault() ?? byAccount.FirstOrDefault();
-
-            
-
-            return new AzureLocation(result, parsedPath, null);
         }
 
     }

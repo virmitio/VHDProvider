@@ -94,7 +94,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="VHDDI.cs" />
     <Compile Include="VHDDriveInfo.cs" />
+    <Compile Include="VHDLoc.cs" />
     <Compile Include="VHDLocation.cs" />
     <Compile Include="VHDProvider.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

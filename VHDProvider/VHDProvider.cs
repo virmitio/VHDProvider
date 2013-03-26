@@ -21,13 +21,12 @@ namespace VHDProvider {
     using ClrPlus.Platform;
     using ClrPlus.Powershell.Provider.Base;
 
-    [CmdletProvider("Azure", ProviderCapabilities.Credentials | ProviderCapabilities.Filter)]
-    public class AzureProvider : UniversalProvider<AzureProviderInfo> {
+    [CmdletProvider("VHD", ProviderCapabilities.Filter)]
+    public class VHDProvider : UniversalProvider<VHDProviderInfo> {
 
         public static readonly Regex AccountFromHostPortRegex = new Regex(@"(?<account>\w+).blob.core.windows.net(?::\d+)?");
-        static AzureProvider() {
-            throw new PSNotImplementedException();
-            var file = Assembly.GetExecutingAssembly().ExtractFileResourceToPath("Azure.format.ps1xml", Path.Combine(FilesystemExtensions.TempPath, "Azure.format.ps1xml"));
+        static VHDProvider() {
+            var file = Assembly.GetExecutingAssembly().ExtractFileResourceToPath("VHDPart.format.ps1xml", Path.Combine(FilesystemExtensions.TempPath, "VHDPart.format.ps1xml"));
             // var file = Assembly.GetExecutingAssembly().ExtractFileResourceToTemp("Azure.format.ps1xml");
             new SessionState().InvokeCommand.InvokeScript("Update-FormatData -PrependPath '{0}'".format(file));
         }
@@ -48,8 +47,7 @@ namespace VHDProvider {
         ///     and return that new instance.
         /// </remarks>
         protected override ProviderInfo Start(ProviderInfo providerInfo) {
-            throw new PSNotImplementedException();
-            return new AzureProviderInfo(providerInfo);
+            return new VHDProviderInfo(providerInfo);
         }
 
         // Start
@@ -86,12 +84,11 @@ namespace VHDProvider {
         ///     method and null should be returned.
         /// </remarks>
         protected override PSDriveInfo NewDrive(PSDriveInfo drive) {
-            throw new PSNotImplementedException();
-            if (drive is AzureDriveInfo)
+            if (drive is VHDDriveInfo)
             {
                 return drive;
             }
-            return new AzureDriveInfo(drive);
+            return new VHDDriveInfo(drive);
         }
 
 
@@ -120,8 +117,13 @@ namespace VHDProvider {
         ///     attributes on the RootDSE. This will help users discover
         ///     interesting mount points for other drives.
         /// </remarks>
-        protected override Collection<PSDriveInfo> InitializeDefaultDrives() {
-            throw new PSNotImplementedException();
+        protected override Collection<PSDriveInfo> InitializeDefaultDrives()
+        {
+            // VHDs have no reasonable root drive to init...
+            return UniversalProviderInfo.AddingDrives;
+
+            //throw new PSNotImplementedException();
+            /*
             var rootDrive = new AzureDriveInfo(AzureDriveInfo.ProviderScheme, ProviderInfo, string.Empty, "Azure namespace", null);
 
             UniversalProviderInfo.AddingDrives.Add(rootDrive);
@@ -131,6 +133,7 @@ namespace VHDProvider {
             }
 
             return UniversalProviderInfo.AddingDrives;
+            */
         }
 
         
@@ -140,12 +143,5 @@ namespace VHDProvider {
 
 
 
-        public static string GetAccountFromHostAndPort(string hostAndPort) {
-            throw new PSNotImplementedException();
-            var match = AccountFromHostPortRegex.Match(hostAndPort);
-            if (match == Match.Empty)
-                return null;
-            return match.Groups["account"].Value;
-        }
     }
 }

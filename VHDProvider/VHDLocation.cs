@@ -20,22 +20,18 @@ namespace VHDProvider {
     using ClrPlus.Core.Extensions;
     using ClrPlus.Core.Utility;
     using ClrPlus.Powershell.Provider.Base;
-    // using Path = Powershell.Provider.Utility.Path;
+    using Path = ClrPlus.Powershell.Provider.Utility.Path;
+    using DiscUtils;
 
-    public class AzureLocation : Location {
-        public static AzureLocation InvalidLocation = new AzureLocation(null, new Path(), null) {
-            _invalidLocation = true
-        };
-
-        public static AzureLocation UnknownLocation = new AzureLocation(null, new Path(), null) {
-            _invalidLocation = true
-        };
+    public class VHDLocation : Location {
+        public static VHDLocation InvalidLocation = new VHDLocation(null, new Path()) { _invalidLocation = true };
+        public static VHDLocation UnknownLocation = new VHDLocation(null, new Path()) { _invalidLocation = true };
 
         private bool _invalidLocation;
-        private readonly AsyncLazy<IListBlobItem> _cloudItem;
-        private readonly AzureDriveInfo _driveInfo;
-        private CloudBlobContainer _cloudContainer;
-        private Stream _blobStream;
+//        private readonly AsyncLazy<IListBlobItem> _cloudItem;
+        private readonly VHDDriveInfo _driveInfo;
+//        private CloudBlobContainer _cloudContainer;
+        private Stream _fileSystemObject;
 
         protected bool IsRootNamespace {
             get {
@@ -51,153 +47,93 @@ namespace VHDProvider {
             }
         }
 
-        protected CloudBlockBlob FileBlob {
-            get {
-                throw new NotImplementedException();
-                return _cloudItem.Value as CloudBlockBlob;
-            }
-        }
-
-        protected CloudBlobDirectory DirectoryBlob {
-            get {
-                throw new NotImplementedException();
-                return _cloudItem.Value as CloudBlobDirectory;
-            }
-        }
-
-        protected CloudBlobContainer CloudContainer {
-            get {
-                throw new NotImplementedException();
-                if (!_invalidLocation && _cloudContainer == null)
-                {
-                    /*
-                    if (_driveInfo.CloudFileSystem == null || Path.Container.IndexOfAny(Wildcards) > -1 || !_driveInfo.CloudFileSystem.ContainerExists(Path.Container)) {
-                        return null;
-                    }
-
-                    _cloudContainer = _driveInfo.CloudFileSystem[Path.Container];
-                     * */
-                    if (_driveInfo.CloudFileSystem != null && Path.Container.IndexOfAny(Wildcards) == -1) {
-                        _cloudContainer = _driveInfo.GetContainer(Path.Container);
+        /*
+                protected CloudBlockBlob FileBlob {
+                    get {
+                        throw new NotImplementedException();
+                        return _cloudItem.Value as CloudBlockBlob;
                     }
                 }
-                return _cloudContainer;
-            }
-        }
 
-        public bool IsContainer {
-            get {
-                throw new NotImplementedException();
-                if (_invalidLocation || string.IsNullOrEmpty(Path.Container) || !string.IsNullOrEmpty(Path.SubPath))
-                {
-                    return false;
-                }
-                return CloudContainer != null;
-            }
-        }
-
-        public bool IsDirectory {
-            get {
-                throw new NotImplementedException();
-                return !_invalidLocation && !string.IsNullOrEmpty(Path.SubPath) && _cloudItem != null && _cloudItem.Value is CloudBlobDirectory;
-            }
-        }
-
-        public string MD5 {
-            get {
-                throw new NotImplementedException();
-                if (FileBlob == null)
-                {
-                    return string.Empty;
-                }
-                var result = FileBlob.Properties.ContentMD5;
-                if (string.IsNullOrEmpty(result)) {
-                    if (FileBlob.Metadata.ContainsKey("MD5")) {
-                        return FileBlob.Metadata["MD5"];
+                protected CloudBlobDirectory DirectoryBlob {
+                    get {
+                        throw new NotImplementedException();
+                        return _cloudItem.Value as CloudBlobDirectory;
                     }
-                    return string.Empty;
                 }
-                return result;
-            }
-        }
 
-        public string MimeType {
-            get {
-                throw new NotImplementedException();
-                return FileBlob != null ? FileBlob.Properties.ContentType : string.Empty;
-            }
-        }
+                protected CloudBlobContainer CloudContainer {
+                    get {
+                        throw new NotImplementedException();
+                        if (!_invalidLocation && _cloudContainer == null)
+                        {
+                            /*
+                            if (_driveInfo.CloudFileSystem == null || Path.Container.IndexOfAny(Wildcards) > -1 || !_driveInfo.CloudFileSystem.ContainerExists(Path.Container)) {
+                                return null;
+                            }
 
-        public AzureLocation(AzureDriveInfo driveInfo, Path path, IListBlobItem cloudItem) {
-            throw new NotImplementedException();
+                            _cloudContainer = _driveInfo.CloudFileSystem[Path.Container];
+                             * //*
+                            if (_driveInfo.CloudFileSystem != null && Path.Container.IndexOfAny(Wildcards) == -1) {
+                                _cloudContainer = _driveInfo.GetContainer(Path.Container);
+                            }
+                        }
+                        return _cloudContainer;
+                    }
+                }
+
+                public bool IsContainer {
+                    get {
+                        throw new NotImplementedException();
+                        if (_invalidLocation || string.IsNullOrEmpty(Path.Container) || !string.IsNullOrEmpty(Path.SubPath))
+                        {
+                            return false;
+                        }
+                        return CloudContainer != null;
+                    }
+                }
+
+                public bool IsDirectory {
+                    get {
+                        throw new NotImplementedException();
+                        return !_invalidLocation && !string.IsNullOrEmpty(Path.SubPath) && _cloudItem != null && _cloudItem.Value is CloudBlobDirectory;
+                    }
+                }
+
+                public string MD5 {
+                    get {
+                        throw new NotImplementedException();
+                        if (FileBlob == null)
+                        {
+                            return string.Empty;
+                        }
+                        var result = FileBlob.Properties.ContentMD5;
+                        if (string.IsNullOrEmpty(result)) {
+                            if (FileBlob.Metadata.ContainsKey("MD5")) {
+                                return FileBlob.Metadata["MD5"];
+                            }
+                            return string.Empty;
+                        }
+                        return result;
+                    }
+                }
+
+                public string MimeType {
+                    get {
+                        throw new NotImplementedException();
+                        return FileBlob != null ? FileBlob.Properties.ContentType : string.Empty;
+                    }
+                }
+        */
+
+        public VHDLocation(VHDDriveInfo driveInfo, Path path) {
             _driveInfo = driveInfo;
             Path = path;
             Path.Validate();
 
-            if (cloudItem != null) {
-
-                _cloudItem = new AsyncLazy<IListBlobItem>(() => {
-                    if (cloudItem is CloudBlockBlob) {
-                        (cloudItem as CloudBlockBlob).FetchAttributes();
-                    }
-                    return cloudItem;
-                });
-            } else {
-                if (IsRootNamespace || IsAccount || IsContainer) {
-                    // azure namespace mount.
-                    _cloudItem = new AsyncLazy<IListBlobItem>(() => null);
-                    return;
-                }
-
-                _cloudItem = new AsyncLazy<IListBlobItem>(() => {
-                    if (CloudContainer == null) {
-                        return null;
-                    }
-                    // not sure if it's a file or a directory.
-                    if (path.EndsWithSlash) {
-                        // can't be a file!
-                        CloudContainer.GetDirectoryReference(Path.SubPath);
-                    }
-                    // check to see if it's a file.
-
-                    ICloudBlob blobRef = null;
-                    try {
-
-                    
-                        blobRef = CloudContainer.GetBlobReferenceFromServer(Path.SubPath);
-                        if (blobRef != null && blobRef.BlobType == BlobType.BlockBlob) {
-                            blobRef.FetchAttributes();
-                            return blobRef;
-                        }
-                    }
-                   catch {
-                        blobRef = CloudContainer.GetBlockBlobReference(Path.SubPath);
-
-                       if (blobRef != null && blobRef.BlobType == BlobType.BlockBlob) {
-                           return blobRef;
-                       }
-                   }
-
-                    
-                       
-                    
-
-                    // well, we know it's not a file, container, or account. 
-                    // it could be a directory (but the only way to really know that is to see if there is any files that have this as a parent path)
-                    var dirRef = CloudContainer.GetDirectoryReference(Path.SubPath);
-                    if (dirRef.ListBlobs().Any()) {
-                        return dirRef;
-                    }
-
-                    // it really didn't match anything, we'll return the reference to the blob in case we want to write to it.
-                    return blobRef;
-                });
-                _cloudItem.InitializeAsync();
-            }
         }
 
         public override void Delete(bool recurse) {
-            throw new NotImplementedException();
             if (IsFile)
             {
                 var result = FileBlob.DeleteIfExists();

@@ -21,18 +21,18 @@ namespace VHDProvider {
     using ClrPlus.Powershell.Provider.Utility;
     using ClrPlus.Scripting.Languages.PropertySheet;
 
-    public class AzureDriveInfo : PSDriveInfo {
+    public class VHDDriveInfo : PSDriveInfo {
 
-        public const string SAS_GUID = "C28BE884-16CF-4401-8B30-18217CF8FF0D";
+        //public const string SAS_GUID = "C28BE884-16CF-4401-8B30-18217CF8FF0D";
 
-        internal const string ProviderScheme = "azure";
-        internal const string ProviderDescription = "azure blob storage";
+        internal const string ProviderScheme = "file";
+        internal const string ProviderDescription = "Offline Virutual Disk";
 
         internal Path Path;
         internal string Secret;
-        private CloudStorageAccount _account;
-        private CloudBlobClient _blobStore;
-        private readonly IDictionary<string, CloudBlobContainer> _containerCache = new XDictionary<string, CloudBlobContainer>();
+//        private CloudStorageAccount _account;
+//        private CloudBlobClient _blobStore;
+//        private readonly IDictionary<string, CloudBlobContainer> _containerCache = new XDictionary<string, CloudBlobContainer>();
 
         private Uri _baseUri;
         private string _accountName;
@@ -60,61 +60,7 @@ namespace VHDProvider {
             }
         }
 
-        internal CloudBlobClient CloudFileSystem {
-            get {
-                throw new PSNotImplementedException();
-                if (_blobStore == null)
-                {
-                    // is the secret really a SAS token?
-                    // Eric : this is the spot to use the token!
-                    if (_isSas) {
-                        _account = new CloudStorageAccount(new StorageCredentials(Secret), _baseUri, null, null);
-                       
-                        _blobStore = _account.CreateCloudBlobClient();
-                        
-                        //get it to the right container and stuff
-                      /*if (_blobStore == null)
-                            throw new ClrPlusException("Couldn't get a CloudBlobClient for SasAccount {0} and SasContainer {1}".format(SasAccountUri, SasContainer));*/
-                    } else {
-                        _account = new CloudStorageAccount(new StorageCredentials(_accountName, Secret), _baseUri, null, null);
-                       
-                        _blobStore = _account.CreateCloudBlobClient();
-                       /* if (_blobStore == null)
-                            throw new ClrPlusException("Couldn't get a CloudBlobClient for SasAccount {0} and SasContainer {1}".format(SasAccountUri, SasContainer));*/
-                    }
-                    
-                }
-                return _blobStore;
-            }
-        }
-
-
-        internal CloudBlobContainer GetContainer(string containerName) {
-            throw new PSNotImplementedException();
-            if (_containerCache.ContainsKey(containerName))
-            {
-                return _containerCache[containerName];
-            }
-            var container = CloudFileSystem.GetContainerReference(containerName);
-
-            if (_isSas) {
-                try {
-                    container.ListBlobs("$$$JUSTCHECKINGIFTHISCONTAINEREVENEXISTS$$$");
-                    _containerCache.Add(containerName, container);
-                } catch {
-                    return null;
-                }
-                return container;
-            } else {
-                if (container.Exists()) {
-                    _containerCache.Add(containerName, container);
-                    return container;
-                }
-            }
-            return null;
-        }
-
-        public AzureDriveInfo(Rule aliasRule, ProviderInfo providerInfo, PSCredential psCredential = null)
+        public VHDDriveInfo(Rule aliasRule, ProviderInfo providerInfo, PSCredential psCredential = null)
             : this(GetDriveInfo(aliasRule, providerInfo, psCredential)) {
 
             // continues where the GetDriveInfo left off.
@@ -155,17 +101,16 @@ namespace VHDProvider {
             return new PSDriveInfo(name, providerInfo, @"{0}:\{1}\{2}\{3}\".format(ProviderScheme, account, container, root), ProviderDescription, psCredential);
         }
 
-        public AzureDriveInfo(PSDriveInfo driveInfo)
+        public VHDDriveInfo(PSDriveInfo driveInfo)
             : base(driveInfo) {
-                throw new PSNotImplementedException();
-                Init(driveInfo.Provider, driveInfo.Root, driveInfo.Credential);
+                Init(driveInfo.Provider, driveInfo.Root);
         }
 
-        public AzureDriveInfo(string name, ProviderInfo provider, string root, string description, PSCredential credential)
+        public VHDDriveInfo(string name, ProviderInfo provider, string root, string description, PSCredential credential)
             : base(name, provider, root, description, credential) {
-                throw new PSNotImplementedException();
-                Init(provider, root, credential);
+                Init(provider, root);
         }
+
         /*
         public static string SetRoot(string root, PSCredential credential) {
             if (credential != null && credential.UserName.Contains(" "))
@@ -197,113 +142,32 @@ namespace VHDProvider {
             return root;
         }*/
 
-        private void Init(ProviderInfo provider, string root, PSCredential credential) {
-            throw new PSNotImplementedException();
+        private void Init(ProviderInfo provider, string root) {
 
-
-            // first, try to get the account from the credential
-            // if that fails, attempt to get it from the root.
-                // http://account.blob.core.windows.net ... guess the account, have the base uri
-                // https://account.blob.core.windows.net ... guess the account, have the base uri
-                
-                // azure://coapp ... -> guess the account, generate the baseuri
-
-                // http://downloads.coapp.org  user must supply account, have the base uri
-                // https://downloads.coapp.org user must supply account, have the base uri
-                // http://127.0.0.1:10000/     user must supply account, have the base uri
-            
             var parsedPath = Path.ParseWithContainer(root);
-            
-            
-            //check if Credential is Sas
 
-               
-            if (credential != null && credential.UserName != null && credential.Password != null) {
-
-                if (credential.UserName.Contains(SAS_GUID)) {
-                    _accountName = credential.UserName.Split(new[] {
-                                                                       SAS_GUID
-                                                                   }, StringSplitOptions.RemoveEmptyEntries)[0];
-                    _isSas = true;
-                } else
-                    _accountName = credential.UserName;
-
-
-
-                if(parsedPath.Scheme == ProviderScheme) {
-                    // generate the baseuri like they do 
-                    _baseUri = new Uri("https://{0}.blob.core.windows.net/".format(_accountName));
-                } else {
-                    _baseUri = new Uri("{0}://{1}/".format(parsedPath.Scheme, parsedPath.HostAndPort));
-                }
-
-                Secret = credential.Password.ToUnsecureString();
-
-            } else {
-                if(parsedPath.Scheme == ProviderScheme) {
-                    _accountName = parsedPath.HostName;
-                    _baseUri = new Uri("https://{0}.blob.core.windows.net/".format(_accountName));
-                }
-                else if (parsedPath.HostName.ToLower().EndsWith(".blob.core.windows.net")) {
-                    _accountName = parsedPath.HostName.Substring(0, parsedPath.HostName.IndexOf('.'));
-                    _baseUri = new Uri("{0}://{1}/".format(parsedPath.Scheme, parsedPath.HostAndPort));
-                } else {
-                    // throw xxx
-                }
-
-                
-            }
+            if (parsedPath.Name.IndexOf('.') < 0)
+                throw new ClrPlusException("Invalid path to virtual disk");
+            if (!(new [] {".vhd", ".vhdx", ".vmdk"}.ContainsIgnoreCase(parsedPath.Name.Substring(parsedPath.Name.LastIndexOf('.')))))
+                throw new ClrPlusException("Invalid path to virtual disk");
 
             Path = parsedPath;
             
-
-           
-
             if (string.IsNullOrEmpty(parsedPath.HostAndPort) || string.IsNullOrEmpty(parsedPath.Scheme)) {
                 Path = parsedPath;
-                return; // this is the root azure namespace.
+                return;
             }
 
-            var pi = provider as AzureProviderInfo;
+            var pi = provider as VHDProviderInfo;
             if (pi == null) {
                 throw new ClrPlusException("Invalid ProviderInfo");
             }
 
-
-            var alldrives = (pi.AddingDrives.Union(pi.Drives)).Select(each => each as AzureDriveInfo).ToArray();
+            // var alldrives = (pi.AddingDrives.Union(pi.Drives)).Select(each => each as VHDDriveInfo).ToArray();
 
             if (parsedPath.Scheme == ProviderScheme) {
-                // it's being passed a full url to a blob storage
+                // it's being passed a full url to a virtual disk
                 Path = parsedPath;
-
-                if (credential == null || credential.Password == null) {
-                    // look for another mount off the same account and container for the credential
-                    foreach (var d in alldrives.Where(d => d.HostAndPort == HostAndPort && d.ContainerName == ContainerName)) {
-                        Secret = d.Secret;
-                        return;
-                    }
-                    // now look for another mount off just the same account for the credential
-                    foreach(var d in alldrives.Where(d => d.HostAndPort == HostAndPort)) {
-                        Secret = d.Secret;
-                        return;
-                    }
-                    throw new ClrPlusException("Missing credential information for {0} mount '{1}'".format(ProviderScheme, root));
-                }
-
-                Secret = credential.Password.ToUnsecureString();
-                return;
-            }
-
-            // otherwise, it's an sub-folder off of another mount.
-            foreach (var d in alldrives.Where(d => d.Name == parsedPath.Scheme)) {
-                Path = new Path {
-                    HostAndPort = d.HostAndPort,
-                    Container = string.IsNullOrEmpty(d.ContainerName) ? parsedPath.HostAndPort : d.ContainerName,
-                    SubPath = string.IsNullOrEmpty(d.RootPath) ? parsedPath.SubPath : d.RootPath + '\\' + parsedPath.SubPath
-                };
-                Path.Validate();
-                Secret = d.Secret;
-                return;
             }
             
         }
