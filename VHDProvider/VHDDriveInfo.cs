@@ -10,6 +10,9 @@
 // </license>
 //-----------------------------------------------------------------------
 
+
+using DiscUtils;
+
 namespace VHDProvider {
     using System;
     using System.Collections.Generic;
@@ -20,12 +23,21 @@ namespace VHDProvider {
     using ClrPlus.Core.Extensions;
     using ClrPlus.Powershell.Provider.Utility;
     using ClrPlus.Scripting.Languages.PropertySheet;
+    using SPath = System.IO.Path;
+    using Directory = System.IO.Directory;
+    using File = System.IO.File;
 
     public class VHDDriveInfo : PSDriveInfo {
 
         //public const string SAS_GUID = "C28BE884-16CF-4401-8B30-18217CF8FF0D";
 
-        internal const string ProviderScheme = "file";
+
+        internal List<string> RootFiles;
+        internal List<int> RootPartitions;
+        internal string InternalRootPath;
+        internal List<VirtualDisk> HomeDisks;
+
+        internal const string ProviderScheme = "vdisk";
         internal const string ProviderDescription = "Offline Virutual Disk";
 
         internal Path Path;
@@ -50,8 +62,6 @@ namespace VHDProvider {
                 return Path.Container;
             }
         }
-
-        private bool _isSas;
 
         internal string RootPath {
             get {
@@ -103,11 +113,15 @@ namespace VHDProvider {
 
         public VHDDriveInfo(PSDriveInfo driveInfo)
             : base(driveInfo) {
+                RootFiles = new List<string>();
+                HomeDisks = new List<VirtualDisk>();
                 Init(driveInfo.Provider, driveInfo.Root);
         }
 
         public VHDDriveInfo(string name, ProviderInfo provider, string root, string description, PSCredential credential)
             : base(name, provider, root, description, credential) {
+                RootFiles = new List<string>();
+                HomeDisks = new List<VirtualDisk>();
                 Init(provider, root);
         }
 
@@ -144,7 +158,66 @@ namespace VHDProvider {
 
         private void Init(ProviderInfo provider, string root) {
 
-            var parsedPath = Path.ParseWithContainer(root);
+//            var parsedPath = Path.ParseWithContainer(root);
+            var parsedPath = Path.ParsePath(root);
+
+            // First, is this a relative path to a file?
+            //// Can't do this right now.  Will code it after the path parser is fixed.
+
+            string currentPath;
+            int pNum = 0;
+
+            // UNC path?
+            if (parsedPath.IsUnc)
+                currentPath = SPath.DirectorySeparatorChar + SPath.DirectorySeparatorChar +
+                              parsedPath.HostAndPort + SPath.DirectorySeparatorChar + parsedPath.Container;
+            else
+                // File on local filesystem?
+                currentPath = parsedPath.Drive + SPath.DirectorySeparatorChar;
+
+            while (pNum < parsedPath.Parts.Length)
+            {
+                while (Directory.Exists(currentPath) && pNum < parsedPath.Parts.Length)
+                    currentPath += SPath.DirectorySeparatorChar + parsedPath.Parts[pNum++];
+                // at this point we must be at either a path that isn't a directory or then end of the path specified.
+                if (!File.Exists(currentPath))
+                    throw new System.IO.FileNotFoundException(currentPath);
+
+                try
+                {
+                    HomeDisks.Add(VirtualDisk.OpenDisk(currentPath, System.IO.FileAccess.ReadWrite));
+                }
+                catch
+                {
+                    HomeDisks.Add(VirtualDisk.OpenDisk(currentPath, System.IO.FileAccess.Read));
+                }
+
+                if (HomeDisks.IsNullOrEmpty())
+                    throw new ClrPlusException("Unknown virtual disk format: {0}".format(currentPath));
+
+                RootFiles.Add(currentPath);
+
+                // if (!HomeDisks.Next(?).IsPartitioned)
+                if (!HomeDisks.First().IsPartitioned)
+                    throw new ClrPlusException("Virtual disk contains no partitions: {0}".format(currentPath));
+
+                if (pNum < parsedPath.Parts.Length)
+                {
+                    if (!int.TryParse(parsedPath.Parts[pNum++], out RootPartition))
+                        throw new ClrPlusException(
+                            "{0} is not a valid partition index".format(parsedPath.Parts[pNum - 1]));
+
+                    // parition specified...
+
+
+                }
+                else
+                {
+                    // No partition specified.
+
+                }
+            }
+
 
             if (parsedPath.Name.IndexOf('.') < 0)
                 throw new ClrPlusException("Invalid path to virtual disk");
