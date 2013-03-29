@@ -158,6 +158,12 @@ namespace VHDProvider {
 
         private void Init(ProviderInfo provider, string root) {
 
+            var pi = provider as VHDProviderInfo;
+            if (pi == null)
+            {
+                throw new ClrPlusException("Invalid ProviderInfo");
+            }
+
 //            var parsedPath = Path.ParseWithContainer(root);
             var parsedPath = Path.ParsePath(root);
 
@@ -183,18 +189,20 @@ namespace VHDProvider {
                 if (!File.Exists(currentPath))
                     throw new System.IO.FileNotFoundException(currentPath);
 
+                VirtualDisk tmpDisk;
                 try
                 {
-                    HomeDisks.Add(VirtualDisk.OpenDisk(currentPath, System.IO.FileAccess.ReadWrite));
+                    tmpDisk = VirtualDisk.OpenDisk(currentPath, System.IO.FileAccess.ReadWrite);
                 }
                 catch
                 {
-                    HomeDisks.Add(VirtualDisk.OpenDisk(currentPath, System.IO.FileAccess.Read));
+                    tmpDisk = VirtualDisk.OpenDisk(currentPath, System.IO.FileAccess.Read);
                 }
 
-                if (HomeDisks.IsNullOrEmpty())
+                if (tmpDisk == null)
                     throw new ClrPlusException("Unknown virtual disk format: {0}".format(currentPath));
 
+                HomeDisks.Add(tmpDisk);
                 RootFiles.Add(currentPath);
 
                 // if (!HomeDisks.Next(?).IsPartitioned)
@@ -203,9 +211,11 @@ namespace VHDProvider {
 
                 if (pNum < parsedPath.Parts.Length)
                 {
-                    if (!int.TryParse(parsedPath.Parts[pNum++], out RootPartition))
+                    int tmpPart;
+                    if (!int.TryParse(parsedPath.Parts[pNum++], out tmpPart))
                         throw new ClrPlusException(
                             "{0} is not a valid partition index".format(parsedPath.Parts[pNum - 1]));
+                    RootPartitions.Add(tmpPart);
 
                     // parition specified...
 
@@ -214,6 +224,7 @@ namespace VHDProvider {
                 else
                 {
                     // No partition specified.
+
 
                 }
             }
@@ -229,11 +240,6 @@ namespace VHDProvider {
             if (string.IsNullOrEmpty(parsedPath.HostAndPort) || string.IsNullOrEmpty(parsedPath.Scheme)) {
                 Path = parsedPath;
                 return;
-            }
-
-            var pi = provider as VHDProviderInfo;
-            if (pi == null) {
-                throw new ClrPlusException("Invalid ProviderInfo");
             }
 
             // var alldrives = (pi.AddingDrives.Union(pi.Drives)).Select(each => each as VHDDriveInfo).ToArray();
